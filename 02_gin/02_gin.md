@@ -20,6 +20,10 @@ import (
 
 **Engine**: 逻辑 web 服务器；一个 Go 程序可以创建多个 Engine。Engine 负责**路由注册 (HTTP endpoint → logic) + middleware 接入**。
 
+:confused: **何为路由？**
+
+将传入的 HTTP 请求映射到特定的 Handler 或资源上。**Handler**: 本质是一个函数，用于处理 HTTP 请求并生成 HTTP 响应。
+
 :construction_worker: 路由注册时使用 IDE 代码提示和源码查看。
 
 :confused: **如何设计路由？使用什么方法？使用路径 or 查询参数？**
@@ -99,15 +103,7 @@ r.GET("/order", func(c *gin.Context) {
 })
 ```
 
-### Web Interface
 
-对于一个用户模块来说，最先要设计的接口就是：**注册 & 登录 Registration & Login**。之后再考虑编辑/查看用户信息。
-
-定义 UserHandler 将所有和用户有关的路由都定义在了这个 Handler 上，同时定义方法注册路由到 Engine 中。
-
-**Handler**: 本质是一个函数，用于处理 HTTP 请求并生成 HTTP 响应。
-
-**采用分散注册使 main 简洁。使用分组注册避免 path 写错。**
 
 
 

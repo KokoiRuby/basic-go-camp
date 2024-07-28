@@ -7,10 +7,12 @@ import (
 
 func main() {
 	s := gin.Default()
-	u := &web.UserHandler{}
-	u.RegisterRoutes(s)
+	u := web.NewUserHandler()
+	u.RegisterRoutesV1(s.Group("/users"))
+	//u.RegisterRoutes(s)
 	err := s.Run(":8080")
 	if err != nil {
 		return
 	}
+
 }

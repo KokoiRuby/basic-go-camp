@@ -1,8 +1,34 @@
 package web
 
-import "github.com/gin-gonic/gin"
+import (
+	"fmt"
+	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
 
 type UserHandler struct {
+	emailRegexp    *regexp.Regexp
+	passwordRegexp *regexp.Regexp
+}
+
+func NewUserHandler() *UserHandler {
+	// regex pattern const, scope control
+	const (
+		emailRegexPattern    = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+		passwordRegexPattern = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[@#$%^&+=]).{8,}$"
+	)
+	return &UserHandler{
+		emailRegexp:    regexp.MustCompile(emailRegexPattern, regexp.None),
+		passwordRegexp: regexp.MustCompile(passwordRegexPattern, regexp.None),
+	}
+}
+
+func (u *UserHandler) RegisterRoutesV1(ug *gin.RouterGroup) {
+	ug.POST("/signup", u.SignUp)
+	ug.POST("/login", u.Login)
+	ug.POST("/edit", u.Edit)
+	ug.GET("/profile", u.Profile)
 }
 
 func (u *UserHandler) RegisterRoutes(s *gin.Engine) {
@@ -11,11 +37,52 @@ func (u *UserHandler) RegisterRoutes(s *gin.Engine) {
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
 	ug.POST("/edit", u.Edit)
-	ug.POST("/profile", u.Profile)
+	ug.GET("/profile", u.Profile)
 }
 
 func (u *UserHandler) SignUp(c *gin.Context) {
 
+	// req struct
+	type SignUpReq struct {
+		Email             string `json:"email"`
+		Password          string `json:"password"`
+		ConfirmedPassword string `json:"confirmPassword"`
+	}
+
+	// bind: unmarshal by content-type
+	var req SignUpReq
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+
+	// validation for email & pwd
+	isMatch, err := u.emailRegexp.MatchString(req.Email)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "System Error.") // 500
+		return
+	}
+	if !isMatch {
+		c.String(http.StatusBadRequest, "Invalid Email.") // 400
+		return
+	}
+
+	if req.Password != req.ConfirmedPassword {
+		c.String(http.StatusBadRequest, "Confirmed Password does not match.")
+		return
+	}
+
+	isMatch, err = u.passwordRegexp.MatchString(req.Password)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "System Error.") // 500
+		return
+	}
+	if !isMatch {
+		c.String(http.StatusBadRequest, "Invalid Password. The password must be greater than 8 characters and include numbers and special characters.") // 400
+		return
+	}
+
+	c.String(http.StatusOK, "Sign Up Successfully.")
+	fmt.Printf("%+v\n", req)
 }
 
 func (u *UserHandler) Login(c *gin.Context) {
