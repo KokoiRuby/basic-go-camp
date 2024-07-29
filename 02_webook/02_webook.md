@@ -148,3 +148,54 @@ if c.Request.Method == "OPTIONS" {
 }
 ```
 
+### mysql
+
+```yaml
+version: '3.8'
+
+# https://hub.docker.com/_/mysql
+services:
+  mysql:
+    image: mysql:9.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    networks:
+      local:
+        ipv4_address: 192.168.80.10
+    ports:
+      - "13306:3306"
+    volumes:
+      - ./script/mysql/:/docker-entrypoint-initdb.d/
+
+networks:
+  local:
+    external: true
+```
+
+```bash
+$ docker compose up
+$ docker compose down
+```
+
+### Project Layout
+
+:confused: **DB CRUB where to put?** Definitely not in UserHandler which only deals with HTTP req & res.
+
+:smile: **领域驱动设计 Domain-Driven Design，DDD**
+
+- Service - Repository - **DAO → 设计模式，用于将应用程序的业务逻辑和数据库操作相互分离，封装接口访问 DB 执行 CRUD**
+- 界限模糊：Address 属于 User 的子域，但随着用户规模的增大，Address 会独立成一个新的领域。
+- 方法论：先明确业务中的领域，再去进行系统设计。
+
+```go
+internal
+├── domain     // 领域，业务对象，或者现实对象在程序中的行为表现
+├── repository // 领域对象存储，抽象整体，不代表 DB
+│   └── dao    // Data Access Object
+│   └── cache  // Cache
+├── service    // 领域服务 = 一个业务的完整处理过程抽象，组合 repository & domain 以及其他 service
+└── web
+    └── user.go
+```
+

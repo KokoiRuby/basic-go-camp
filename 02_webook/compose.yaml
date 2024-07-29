@@ -1,0 +1,21 @@
+version: '3.8'
+
+# https://hub.docker.com/_/mysql
+services:
+  mysql:
+    container_name: mysql
+    image: mysql:9.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    networks:
+      local:
+        ipv4_address: 192.168.80.10
+    ports:
+      - "13306:3306"
+    volumes:
+      - ./script/mysql/:/docker-entrypoint-initdb.d/
+
+networks:
+  local:
+    external: true
