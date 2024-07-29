@@ -68,13 +68,83 @@ func NewUserHandler() *UserHandler {
 }
 ```
 
+### Middleware
+
+中间件 AKA plugin/handler/filter/interceptor → **AOP 解决方案：所有业务都关联的逻辑处理进行抽离**，比如：AuthN & AuthZ, Logging, Monitoring。
+
+**Request → []middleware → Business Logic**
+
+```go
+// 注册 middleware，可传入多个 HandlerFunc
+func (engine *Engine) Use(middleware ...HandlerFunc) IRoutes
+// type redef, func as type
+type HandlerFunc func(*Context)
+```
+
+```go
+s := gin.Default()	
+
+// ordered
+s.Use(func(c *gin.Context) {
+	fmt.Println("1st middleware")
+})
+
+s.Use(func(c *gin.Context) {
+	fmt.Println("2nd middleware")
+})
+```
+
 ### CORS
 
-**跨域请求**：访问不同域（protocol/domain/port）的资源时会遇到的安全限制问题，如果不做任何处理，一般无法发送成功。
+跨域问题：由浏览器的**同源策略（Same-Origin Policy）**引起的，该策略要求浏览器只允许页面加载来自同一域的资源，以**防止恶意网站获取用户的敏感信息**。
+
+```bash
+Access to XMLHttpRequest at 'dst' from origin 'src' has been blocked by CORS policy：
+Response to preflight request does not pass access control check:
+No 'Access-Control-Allow-Origin' header is present on the requested resource.
+```
+
+**跨域资源共享 Cross-Origin Resource Sharing**
+
+:construction_worker: 浏览器通过 preflight 请求 HTTP OPTIONS 询问 dst 是否可以接受 src 的请求。
+
+:construction_worker: dst 需要在 preflight 响应中 ++headers: `Access-Control-[Allow-Origin|Allow-Headers|Allow-Metods]`。
+
+:bookmark_tabs: Middleware: [gin-gonic/contrib](https://github.com/gin-gonic/contrib) → [CORS](https://github.com/gin-contrib/cors)
 
 
 
+![img](02_webook.assets/image-20240729192803874-1722252524904.png)
 
 
 
+**CORS 通过**：浏览器会返回客户端 204 No Content 即 dst 允许 src 的来向请求。
+
+```go
+s.Use(cors.New(cors.Config{
+    // AllowOrigins: []string{"*"}                            // better not
+    AllowOrigins: []string{"http://localhost:3000"},          // 指定允许跨域请求的来源
+	AllowMethods: []string{"POST", "GET"},                    // 指定允许的 HTTP 方法
+	AllowHeaders: []string{"Content-Type", "Authorization"},  // 定允许跨域请求中携带的请求头部
+	ExposeHeaders: []string{"Content-Type", "Authorization"}, // 指定服务器允许暴露给客户端的响应头部
+	AllowCredentials: true,                                   // 指定是否允许跨域请求携带认证信息 like Cookie
+	AllowOriginFunc: func(origin string) bool {
+		// dev
+        if strings.HasPrefix(origin, "http://localhost") {
+			return true
+		}
+        // prod
+		return strings.Contains(origin, "company.domain.name.com")
+	},
+	MaxAge: 12 * time.Hour,                                   // preflight 有效期
+}))
+```
+
+```go
+// cors.go → config.go
+if c.Request.Method == "OPTIONS" {
+	cors.handlePreflight(c)
+	defer c.AbortWithStatus(cors.optionsResponseStatusCode) // 204
+}
+```
 
