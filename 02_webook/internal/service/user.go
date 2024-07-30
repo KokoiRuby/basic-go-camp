@@ -39,19 +39,19 @@ func (svc *UserService) SignUp(ctx context.Context, user domain.User) error {
 
 }
 
-func (svc *UserService) Login(ctx context.Context, user domain.User) error {
+func (svc *UserService) Login(ctx context.Context, user domain.User) (domain.User, error) {
 	// 1. user find by email
 	u, err := svc.repo.FindByEmail(ctx, user)
 	if errors.Is(err, ErrUserNotFound) {
-		return ErrInvalidEmailOrPassword
+		return domain.User{}, ErrInvalidEmailOrPassword
 	}
 	if err != nil {
-		return err
+		return domain.User{}, err
 	}
 	// 2. compare pwd
 	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(user.Password))
 	if err != nil {
-		return ErrInvalidEmailOrPassword
+		return domain.User{}, ErrInvalidEmailOrPassword
 	}
-	return nil
+	return u, nil
 }

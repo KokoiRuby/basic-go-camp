@@ -340,4 +340,78 @@ return nil
 
 ### Cookie & Session
 
-`
+HTTP 无状态，服务器无法区分请求之间是否存在关联性，视为独立请求。所以需要**状态维持机制**。
+
+Cookie 浏览器本地维护 K/V，不安全；如果一旦非法读取就会被冒充身份。
+
+`net/http.Cookie`
+
+- `Domain`: Cookie 可以用在什么域名下，按照最小化原则来设定。
+- `Path`：Cookie 可以用在什么路径下，同样按照最小化原则来设定。
+- `Max-Age` 和 `Expires`：过期时间，只保留必要时间。
+- **`Http-Only`：设置为 true 的话，那么浏览器上的 JS 代码将无法使用这个 Cookie。生产永远设置为 true。**
+- **`Secure`：只能用于 HTTPS 协议，生产环境永远设置为 true。**
+- `SameSite`：是否允许跨站发送 Cookie，尽量避免。
+
+Session **服务器**维护连接状态信息，基于 session ID 标识身份。一旦被拦截，也会被冒充。
+
+:confused: **如何携带 session_id?**
+
+1. ~~In-Cookie~~
+2. Header
+3. Query param → ?sess_id=...
+
+:construction_worker: Gin Plugin - [Session](https://github.com/gin-contrib/sessions)
+
+1. 设置 Session 于 Header `Set-Cookie`
+
+```go
+r := gin.Default()
+store := cookie.NewStore([]byte("secret"))    // 创建了一个基于 cookie 的会话存储（session store）
+r.Use(sessions.Sessions("session_id", store)) // 中间件应用到 Gin 引擎中，指定会话名 + 会话存储
+```
+
+```go
+// web/user.go
+// login successfully
+// set up session
+sess := sessions.Default(c)
+sess.Set("userId", user.Id)
+err = sess.Save()
+if err != nil {
+	return
+}
+```
+
+
+
+2. 获取 Session 并校验是否已登录
+
+```go
+package main
+
+import (
+  "github.com/gin-contrib/sessions"
+  "github.com/gin-contrib/sessions/cookie"
+  "github.com/gin-gonic/gin"
+)
+
+func main() {
+  r := gin.Default()
+  store := cookie.NewStore([]byte("secret"))
+  r.Use(sessions.Sessions("mysession", store))
+
+  r.GET("/hello", func(c *gin.Context) {
+    session := sessions.Default(c)
+
+    if session.Get("hello") != "world" {
+      session.Set("hello", "world")
+      session.Save()
+    }
+
+    c.JSON(200, gin.H{"hello": session.Get("hello")})
+  })
+  r.Run(":8000")
+}
+```
+

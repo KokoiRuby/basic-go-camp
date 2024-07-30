@@ -5,7 +5,10 @@ import (
 	"geekbang/basic-go/02_webook/internal/repository/dao"
 	"geekbang/basic-go/02_webook/internal/service"
 	"geekbang/basic-go/02_webook/internal/web"
+	"geekbang/basic-go/02_webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -46,6 +49,14 @@ func initServer() *gin.Engine {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+
+	// session
+	store := cookie.NewStore([]byte("secret"))
+	s.Use(sessions.Sessions("session_id", store))
+
+	// session validation handler, chain
+	s.Use(middleware.NewLoginMiddleWareBuilder().IgnorePaths("/users/login").IgnorePaths("/users/signup").Build())
+
 	return s
 }
 

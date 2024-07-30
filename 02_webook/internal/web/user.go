@@ -6,6 +6,7 @@ import (
 	"geekbang/basic-go/02_webook/internal/domain"
 	"geekbang/basic-go/02_webook/internal/service"
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -116,7 +117,7 @@ func (u *UserHandler) Login(c *gin.Context) {
 	if err := c.BindJSON(&req); err != nil {
 		return
 	}
-	err := u.svc.Login(c, domain.User{
+	user, err := u.svc.Login(c, domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})
@@ -128,6 +129,15 @@ func (u *UserHandler) Login(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "System Error.") // 500
 		return
 	}
+
+	// login successfully
+	// set up session
+	sess := sessions.Default(c)
+	sess.Set("userId", user.Id)
+	err = sess.Save()
+	if err != nil {
+		return
+	}
 	c.String(http.StatusOK, "Login Successfully.")
 }
 
@@ -136,5 +146,5 @@ func (u *UserHandler) Edit(c *gin.Context) {
 }
 
 func (u *UserHandler) Profile(c *gin.Context) {
-
+	c.String(http.StatusOK, "My Profile.") // 200
 }
