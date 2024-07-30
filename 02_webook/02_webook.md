@@ -178,7 +178,7 @@ $ docker compose up
 $ docker compose down
 ```
 
-### Project Layout
+### Domain-Driven Design
 
 :confused: **DB CRUB where to put?** Definitely not in UserHandler which only deals with HTTP req & res.
 
@@ -187,6 +187,10 @@ $ docker compose down
 - Service - Repository - **DAO → 设计模式，用于将应用程序的业务逻辑和数据库操作相互分离，封装接口访问 DB 执行 CRUD**
 - 界限模糊：Address 属于 User 的子域，但随着用户规模的增大，Address 会独立成一个新的领域。
 - 方法论：先明确业务中的领域，再去进行系统设计。
+
+**Flow**: **web** (http) → **service** (bl) → **repository** (store obj abstraction) → **dao** (DB CRUD)
+
+- `domain.User` 业务层面；`dao.User` 数据库层面 → Table
 
 ```go
 internal
@@ -199,3 +203,115 @@ internal
     └── user.go
 ```
 
+基于**依赖注入**完成初始化，降低类之间的耦合性。
+
+```go
+db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13306)/webook"))
+if err != nil {
+	// only panic during init
+	panic(err)
+}
+err = dao.InitTable(db)
+if err != nil {
+	panic(err)
+}
+ud := dao.NewUserDAO(db)
+repo := repository.NewUserRepository(ud)
+svc := service.NewUserService(repo)
+u := web.NewUserHandler(svc)
+```
+
+**建表**：一般都需要审批 SQL by DBA，最重要的是索引是否正确。
+
+IDE → DB → SQL Sripts → Generate DDL to Clipboard
+
+```mysql
+create table webook.users
+(
+    id       bigint auto_increment
+        primary key,
+    email    varchar(100) null,
+    password varchar(100) null,
+    ctime    bigint       null,
+    utime    bigint       null,
+    constraint uni_users_email
+        unique (email)
+);
+
+create index idx_users_ctime
+    on webook.users (ctime);
+
+create index idx_users_utime
+    on webook.users (utime);
+```
+
+### Encryption
+
+个人敏感信息需加密存储。
+
+:confused: **谁来加密？**
+
+- domain 业务概念
+- **svc 业务概念**
+- repo 存储概念
+- dao 数据库概念，可以交给 DB，但是存在性能问题，DB 还要接受大量读写请求，压力山大。
+
+:confused: **加密算法？**
+
+1. md5 hash
+2. md5 hash + salt or multi-hash
+3. random salt
+
+**推荐 BCrypt** :warning: 不能超过 72 bytes，regexp 需要校验
+
+- 不需要你自己去生成盐值。
+- 不需要额外存储盐值。
+- 可以通过控制 cost 来控制加密性能。
+- 同样的文本，加密后的结果不同。
+
+### Email Conflict
+
+底层数据库强耦合，需要**类型断言**错误是否属于数据库唯一字段冲突。
+
+```go
+err := dao.db.WithContext(ctx).Create(&user).Error
+// type assertion
+var mysqlErr *mysql.MySQLError
+if errors.As(err, &mysqlErr) {
+	const uniqueIndexErrNo uint16 = 1062
+	if mysqlErr.Number == uniqueIndexErrNo {
+		// conflict
+		return ErrUserDuplicateEmail
+	}
+}
+```
+
+依次向上传递 dao → repo → svc → web，每一层独立的 err 不存在跨层。
+
+```go
+// web 
+if errors.Is(err, service.ErrUserDuplicateEmail) {
+	c.String(http.StatusConflict, "Email Conflict.")
+	return
+}
+
+// svc ↑
+var (
+	// ErrUserDuplicateEmail alias
+	ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
+)
+
+// repo ↑
+
+var (
+	// ErrUserDuplicateEmail alias
+	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
+)
+
+// dao ↑
+var (
+	ErrUserDuplicateEmail = errors.New("duplicate email")
+)
+```
+
+### Login

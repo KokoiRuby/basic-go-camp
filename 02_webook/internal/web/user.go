@@ -1,24 +1,29 @@
 package web
 
 import (
+	"errors"
 	"fmt"
+	"geekbang/basic-go/02_webook/internal/domain"
+	"geekbang/basic-go/02_webook/internal/service"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
 
 type UserHandler struct {
+	svc            *service.UserService
 	emailRegexp    *regexp.Regexp
 	passwordRegexp *regexp.Regexp
 }
 
-func NewUserHandler() *UserHandler {
+func NewUserHandler(svc *service.UserService) *UserHandler {
 	// regex pattern const, scope control
 	const (
 		emailRegexPattern    = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-		passwordRegexPattern = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[@#$%^&+=]).{8,}$"
+		passwordRegexPattern = "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[@#$%^&+=]).{8,72}$"
 	)
 	return &UserHandler{
+		svc:            svc,
 		emailRegexp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRegexp: regexp.MustCompile(passwordRegexPattern, regexp.None),
 	}
@@ -78,6 +83,22 @@ func (u *UserHandler) SignUp(c *gin.Context) {
 	}
 	if !isMatch {
 		c.String(http.StatusBadRequest, "Invalid Password. The password must be greater than 8 characters and include numbers and special characters.") // 400
+		return
+	}
+
+	// call svc with domain obj
+	// mutation no need ConfirmedPassword anymore
+	err = u.svc.SignUp(c, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if errors.Is(err, service.ErrUserDuplicateEmail) {
+		c.String(http.StatusConflict, "Email Conflict.")
+		return
+	}
+
+	if err != nil {
+		c.String(http.StatusInternalServerError, "System Error.") // 500
 		return
 	}
 

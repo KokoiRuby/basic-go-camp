@@ -1,14 +1,31 @@
 package main
 
 import (
+	"geekbang/basic-go/02_webook/internal/repository"
+	"geekbang/basic-go/02_webook/internal/repository/dao"
+	"geekbang/basic-go/02_webook/internal/service"
 	"geekbang/basic-go/02_webook/internal/web"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"strings"
 	"time"
 )
 
 func main() {
+	db := initDB()
+	server := initServer()
+	user := initUser(db)
+	user.RegisterRoutesV1(server.Group("/users"))
+	//user.RegisterRoutes(s)
+	err := server.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+
+func initServer() *gin.Engine {
 	s := gin.Default()
 
 	// CORS ← fe as input
@@ -29,13 +46,26 @@ func main() {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+	return s
+}
 
-	u := web.NewUserHandler()
-	u.RegisterRoutesV1(s.Group("/users"))
-	//u.RegisterRoutes(s)
-	err := s.Run(":8080")
+func initUser(db *gorm.DB) *web.UserHandler {
+	ud := dao.NewUserDAO(db)
+	repo := repository.NewUserRepository(ud)
+	svc := service.NewUserService(repo)
+	u := web.NewUserHandler(svc)
+	return u
+}
+
+func initDB() *gorm.DB {
+	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13306)/webook"))
 	if err != nil {
-		return
+		// only panic during init
+		panic(err)
 	}
-
+	err = dao.InitTable(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }
