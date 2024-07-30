@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrUserDuplicateEmail = errors.New("duplicate email")
+	ErrUserNotFound       = gorm.ErrRecordNotFound
 )
 
 type UserDAO struct {
@@ -37,6 +38,13 @@ func (dao *UserDAO) Insert(ctx context.Context, user User) error {
 		}
 	}
 	return err
+}
+
+func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+	var user User
+	//err := dao.db.WithContext(ctx).Where("email = ?, email").First(&user).Error
+	err := dao.db.WithContext(ctx).First(&user, "email = ?", email).Error
+	return user, err
 }
 
 // User maps to DB entity/model/PO Persistent Object

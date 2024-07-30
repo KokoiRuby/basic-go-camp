@@ -274,6 +274,7 @@ create index idx_users_utime
 底层数据库强耦合，需要**类型断言**错误是否属于数据库唯一字段冲突。
 
 ```go
+// dao/user.go
 err := dao.db.WithContext(ctx).Create(&user).Error
 // type assertion
 var mysqlErr *mysql.MySQLError
@@ -315,3 +316,28 @@ var (
 ```
 
 ### Login
+
+1. Find User by User.Email (error if not found)
+2. Compare User.Passowrd with given password.
+
+```go
+// service/user.go
+// 1. user find by email
+u, err := svc.repo.FindByEmail(ctx, user)
+if errors.Is(err, ErrUserNotFound) {
+	return ErrInvalidEmailOrPassword
+}
+if err != nil {
+	return err
+}
+// 2. compare pwd
+err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(user.Password))
+if err != nil {
+	return ErrInvalidEmailOrPassword
+}
+return nil
+```
+
+### Cookie & Session
+
+`

@@ -107,7 +107,28 @@ func (u *UserHandler) SignUp(c *gin.Context) {
 }
 
 func (u *UserHandler) Login(c *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
 
+	var req LoginReq
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+	err := u.svc.Login(c, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if errors.Is(err, service.ErrInvalidEmailOrPassword) {
+		c.String(http.StatusUnauthorized, "Incorrect Email or Password.") // 401
+		return
+	}
+	if err != nil {
+		c.String(http.StatusInternalServerError, "System Error.") // 500
+		return
+	}
+	c.String(http.StatusOK, "Login Successfully.")
 }
 
 func (u *UserHandler) Edit(c *gin.Context) {

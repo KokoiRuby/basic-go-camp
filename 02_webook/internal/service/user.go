@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"geekbang/basic-go/02_webook/internal/domain"
 	"geekbang/basic-go/02_webook/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -9,7 +10,9 @@ import (
 
 var (
 	// ErrUserDuplicateEmail alias
-	ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
+	ErrUserDuplicateEmail     = repository.ErrUserDuplicateEmail
+	ErrInvalidEmailOrPassword = errors.New("invalid email or password")
+	ErrUserNotFound           = repository.ErrUserNotFound
 )
 
 type UserService struct {
@@ -34,4 +37,21 @@ func (svc *UserService) SignUp(ctx context.Context, user domain.User) error {
 	// call repo
 	return svc.repo.Create(ctx, user)
 
+}
+
+func (svc *UserService) Login(ctx context.Context, user domain.User) error {
+	// 1. user find by email
+	u, err := svc.repo.FindByEmail(ctx, user)
+	if errors.Is(err, ErrUserNotFound) {
+		return ErrInvalidEmailOrPassword
+	}
+	if err != nil {
+		return err
+	}
+	// 2. compare pwd
+	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(user.Password))
+	if err != nil {
+		return ErrInvalidEmailOrPassword
+	}
+	return nil
 }
